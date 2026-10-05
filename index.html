@@ -1,45 +1,167 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8">
+  <!-- viewport-fit=cover: layar penuh di iPhone berponi; tanpa user-scalable agar iOS tidak zoom saat mengetik -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
   <title>ABSENSI WFH BAWASLU JATENG</title>
-  <link rel="icon" href="https://drive.google.com/file/d/1DVAhzlddl3rsDe2cTiiUEZfpBJEmiGAW" />
+  <meta name="description" content="E-Presensi WFH Sekretariat Bawaslu Provinsi Jawa Tengah">
+
+  <!-- Warna bar browser (Android) & tampilan seperti aplikasi (iOS) -->
+  <meta name="theme-color" content="#0d1029">
+  <meta name="color-scheme" content="dark">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Absensi WFH">
+  <meta name="format-detection" content="telephone=no">
+
+  <!-- Ikon (memakai format gambar langsung, bukan halaman Drive) -->
+  <link rel="icon" href="https://lh3.googleusercontent.com/d/1DVAhzlddl3rsDe2cTiiUEZfpBJEmiGAW">
+  <link rel="apple-touch-icon" href="https://lh3.googleusercontent.com/d/1DVAhzlddl3rsDe2cTiiUEZfpBJEmiGAW">
+
+  <!-- Percepat koneksi ke server aplikasi -->
+  <link rel="preconnect" href="https://script.google.com" crossorigin>
+  <link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
+  <link rel="preconnect" href="https://lh3.googleusercontent.com" crossorigin>
+  <link rel="dns-prefetch" href="https://cdn.tailwindcss.com">
+  <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
+  <link rel="dns-prefetch" href="https://unpkg.com">
+
   <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
-      background-color: #eee;
-      overflow: hidden; /* Mencegah scroll ganda */
+    *,*::before,*::after{box-sizing:border-box}
+    html,body{
+      margin:0;padding:0;width:100%;height:100%;
+      background:#0d1029;           /* sama dengan warna aplikasi, tidak ada kilatan putih */
+      overflow:hidden;
+      overscroll-behavior:none;
+      -webkit-text-size-adjust:100%;
+      -webkit-tap-highlight-color:transparent;
+      font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
     }
+    .frame{
+      position:fixed;inset:0;width:100%;
+      height:100vh;                 /* cadangan browser lama */
+      height:-webkit-fill-available;/* iOS Safari lama */
+      height:100dvh;                /* browser modern: mengikuti address bar HP */
+      background:#0d1029;
+    }
+    iframe{
+      display:block;width:100%;height:100%;border:0;
+      opacity:0;transition:opacity .35s ease;
+      -webkit-overflow-scrolling:touch;
+    }
+    iframe.ready{opacity:1}
 
-    .iframe-container {
-      width: 100%;
-      height: 100dvh; /* Menggunakan dvh agar pas di mobile browser */
-      overflow: hidden;
+    /* Layar pemuatan */
+    #loader{
+      position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;
+      padding:env(safe-area-inset-top) 24px env(safe-area-inset-bottom);
+      background:linear-gradient(160deg,#1e1b4b,#0d1029 55%,#083344);color:#e2e8f0;text-align:center;
+      transition:opacity .4s ease,visibility .4s;
     }
-
-    iframe {
-      display: block;
-      width: 100%;
-      height: 100%;
-      border: none;
-    }
+    #loader.hide{opacity:0;visibility:hidden;pointer-events:none}
+    .ring{width:54px;height:54px;border-radius:50%;border:5px solid rgba(255,255,255,.15);border-top-color:#fbbf24;animation:spin 0.9s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .ttl{font-weight:800;font-size:15px;letter-spacing:.12em}
+    .sub{font-size:12px;opacity:.7;max-width:280px;line-height:1.5}
+    #err{display:none;flex-direction:column;align-items:center;gap:12px}
+    #err.show{display:flex}
+    .btn{appearance:none;border:0;cursor:pointer;text-decoration:none;font:700 13px system-ui,sans-serif;padding:12px 22px;border-radius:999px;color:#fff;background:linear-gradient(90deg,#f59e0b,#ea580c);box-shadow:0 8px 22px -8px rgba(245,158,11,.8)}
+    .btn.alt{background:rgba(255,255,255,.14);box-shadow:none}
+    .btn:active{transform:scale(.97)}
+    @media (prefers-reduced-motion:reduce){.ring{animation-duration:2s}iframe,#loader{transition:none}}
   </style>
 </head>
 <body>
-  <div class="iframe-container">
+
+  <div id="loader" role="status" aria-live="polite">
+    <div class="ring" id="ring"></div>
+    <div class="ttl">E-PRESENSI WFH</div>
+    <div class="sub" id="msg">Sedang memuat aplikasi absensi, mohon tunggu sebentar...</div>
+    <div id="err">
+      <button class="btn" type="button" onclick="reloadApp()">Muat Ulang</button>
+      <a class="btn alt" id="direct" href="#" target="_top" rel="noopener">Buka Langsung</a>
+    </div>
+  </div>
+
+  <div class="frame">
     <iframe
       id="app"
+      title="Absensi WFH Bawaslu Jateng"
       src="https://script.google.com/macros/s/AKfycbwZXL5WbZFLtwu8uYgakbyNfUOUl6pp1YxLqZ_vXcVVO3LcOJxaS0rzX9yoRCIZBTaF/exec"
       scrolling="yes"
-      allowfullscreen="true"
-      webkitallowfullscreen="true"
-      mozallowfullscreen="true"
-      allow="fullscreen; camera; microphone; display-capture; geolocation;">
+      allowfullscreen
+      referrerpolicy="origin"
+      allow="geolocation *; camera *; microphone *; fullscreen *; display-capture *; clipboard-write *">
     </iframe>
   </div>
+
+  <noscript>
+    <div style="position:fixed;inset:0;z-index:20;background:#0d1029;color:#fff;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px">
+      Aktifkan JavaScript pada browser Anda untuk membuka aplikasi absensi.
+    </div>
+  </noscript>
+
+  <script>
+  (function () {
+    var frame  = document.getElementById('app');
+    var loader = document.getElementById('loader');
+    var err    = document.getElementById('err');
+    var msg    = document.getElementById('msg');
+    var ring   = document.getElementById('ring');
+    var APP_URL = frame.getAttribute('src');
+    var timer, done = false;
+
+    document.getElementById('direct').href = APP_URL;
+
+    function showError(text) {
+      if (done) return;
+      ring.style.display = 'none';
+      msg.textContent = text;
+      err.classList.add('show');
+    }
+
+    function startTimer() {
+      clearTimeout(timer);
+      timer = setTimeout(function () {
+        showError(navigator.onLine === false
+          ? 'Tidak ada koneksi internet. Periksa jaringan Anda lalu coba lagi.'
+          : 'Pemuatan terlalu lama. Silakan muat ulang atau buka langsung.');
+      }, 20000);
+    }
+
+    frame.addEventListener('load', function () {
+      done = true;
+      clearTimeout(timer);
+      frame.classList.add('ready');
+      loader.classList.add('hide');
+    });
+
+    window.reloadApp = function () {
+      done = false;
+      err.classList.remove('show');
+      ring.style.display = '';
+      msg.textContent = 'Memuat ulang aplikasi...';
+      loader.classList.remove('hide');
+      frame.classList.remove('ready');
+      startTimer();
+      frame.src = APP_URL;
+    };
+
+    // Otomatis coba lagi saat internet kembali
+    window.addEventListener('online', function () { if (!done) window.reloadApp(); });
+
+    // Setelah HP dikunci/dibuka lagi atau kembali dari tab lain (bfcache iOS), pastikan aplikasi tetap tampil
+    window.addEventListener('pageshow', function (e) {
+      if (e.persisted && !done) window.reloadApp();
+    });
+
+    // Cegah zoom ganda (iOS) tanpa mengganggu scroll di dalam aplikasi
+    document.addEventListener('gesturestart', function (e) { e.preventDefault(); });
+
+    startTimer();
+  })();
+  </script>
 </body>
 </html>
